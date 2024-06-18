@@ -41,6 +41,29 @@ class MessageModel {
   }
 }
 
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  if (Platform.isAndroid) {
+    final sdkIntMatch =
+        RegExp(r'\d+').firstMatch(Platform.operatingSystemVersion);
+    if (sdkIntMatch != null) {
+      final sdkInt = int.parse(sdkIntMatch.group(0)!);
+      if (sdkInt >= 33) {
+        final status = await Permission.notification.request();
+        if (status != PermissionStatus.granted) {
+          await Permission.notification.request();
+        }
+      }
+    }
+  }
+  NotificationService.initialize(); // 确保通知服务初始化
+  print('[kyoumai]已经初始化通知服务');
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  print('[kyoumai]已经初始化后台消息处理');
+  runApp(MyApp());
+}
+
 // 通知服务
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -49,8 +72,10 @@ class NotificationService {
   static void initialize() {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
+
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
+
     _notificationsPlugin.initialize(initializationSettings);
 
     // 创建通知渠道
@@ -68,6 +93,7 @@ class NotificationService {
   }
 
   static void showNotification(RemoteMessage message) {
+    print("[Kyoumai]showNotification被触发");
     const NotificationDetails notificationDetails = NotificationDetails(
       android: AndroidNotificationDetails(
         'kyoumaipush',
@@ -89,28 +115,12 @@ class NotificationService {
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  NotificationService.showNotification(message);
-}
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  if (Platform.isAndroid) {
-    final sdkIntMatch =
-        RegExp(r'\d+').firstMatch(Platform.operatingSystemVersion);
-    if (sdkIntMatch != null) {
-      final sdkInt = int.parse(sdkIntMatch.group(0)!);
-      if (sdkInt >= 33) {
-        final status = await Permission.notification.request();
-        if (status != PermissionStatus.granted) {
-          await Permission.notification.request();
-        }
-      }
-    }
+  // 确保这里能够处理数据消息
+  if (message.data.isNotEmpty) {
+    // 处理数据消息，例如显示通知
+    NotificationService.showNotification(message);
   }
-  NotificationService.initialize(); // 确保通知服务初始化
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  runApp(MyApp());
+  print("[Kyoumai]后台消息处理被触发: ${message.messageId}");
 }
 
 class MyApp extends StatelessWidget {
@@ -187,10 +197,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (token != null) {
         fcmToken = token;
         isFcmAvailable = true;
-        print("FCM Token: $token");
+        print("[Kyoumai]FCM Token: $token");
       } else {
         isFcmAvailable = false;
-        print("Failed to get FCM token.");
+        print("[Kyoumai]Failed to get FCM token.");
       }
     });
   }
@@ -209,12 +219,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
           fcmToken = token;
           isFcmAvailable = true;
         });
-        print("FCM Token: $token");
+        print("[Kyoumai]FCM Token: $token");
       } else {
         setState(() {
           isFcmAvailable = false;
         });
-        print("Failed to get FCM token.");
+        print("[Kyoumai]Failed to get FCM token.");
       }
     });
 
@@ -229,7 +239,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       final String body = message.notification?.body ?? '';
       final String time =
           message.data['time'] ?? DateTime.now().toIso8601String();
-
+      print("[Kyoumai]草");
+      NotificationService.showNotification(message);
+      print("[Kyoumai]草");
+      print("[Kyoumai]Message received: $title, $body, $time");
       _saveMessage(title, body, time);
       setState(() {
         _messages.insert(
@@ -249,7 +262,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Message clicked');
+      print('[Kyoumai]Message clicked');
     });
   }
 
