@@ -10,10 +10,10 @@ import 'dart:io'; // 导入IO包
 
 // 消息模型
 class MessageModel {
-  final int id;
-  final String title;
-  final String body;
-  final DateTime time;
+  int id;
+  String title;
+  String body;
+  DateTime time;
 
   MessageModel({
     required this.id,
@@ -155,6 +155,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
+
 class MyHomePage extends StatefulWidget {
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -165,41 +166,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   String fcmToken = '';
   List<MessageModel> _messages = [];
   bool isFcmAvailable = false;
-
-  Future<void> _deleteMessage(int index) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    _messages.removeAt(index);
-    await prefs.setStringList(
-      'messages',
-      _messages.map((e) => json.encode(e.toMap())).toList(),
-    );
-    setState(() {});
-  }
-
-  Future<List<MessageModel>> _loadMessages() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    List<String>? storedMessages = prefs.getStringList('messages');
-    if (storedMessages != null) {
-      return storedMessages
-          .map((e) => MessageModel.fromMap(json.decode(e)))
-          .toList();
-    }
-    return [];
-  }
-
-  Future<void> _retryGetFcmToken() async {
-    String? token = await FirebaseMessaging.instance.getToken();
-    setState(() {
-      if (token != null) {
-        fcmToken = token;
-        isFcmAvailable = true;
-        print("[Kyoumai]FCM Token: $token");
-      } else {
-        isFcmAvailable = false;
-        print("[Kyoumai]Failed to get FCM token.");
-      }
-    });
-  }
 
   @override
   void initState() {
@@ -259,6 +225,41 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('[Kyoumai]Message clicked');
+    });
+  }
+
+  Future<void> _deleteMessage(int index) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _messages.removeAt(index);
+    await prefs.setStringList(
+      'messages',
+      _messages.map((e) => json.encode(e.toMap())).toList(),
+    );
+    setState(() {});
+  }
+
+  Future<List<MessageModel>> _loadMessages() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? storedMessages = prefs.getStringList('messages');
+    if (storedMessages != null) {
+      return storedMessages
+          .map((e) => MessageModel.fromMap(json.decode(e)))
+          .toList();
+    }
+    return [];
+  }
+
+  Future<void> _retryGetFcmToken() async {
+    String? token = await FirebaseMessaging.instance.getToken();
+    setState(() {
+      if (token != null) {
+        fcmToken = token;
+        isFcmAvailable = true;
+        print("[Kyoumai]FCM Token: $token");
+      } else {
+        isFcmAvailable = false;
+        print("[Kyoumai]Failed to get FCM token.");
+      }
     });
   }
 
