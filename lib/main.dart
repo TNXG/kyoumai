@@ -58,10 +58,19 @@ void main() async {
     }
   }
   NotificationService.initialize(); // 确保通知服务初始化
-  print('[kyoumai]已经初始化通知服务');
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  print('[kyoumai]已经初始化后台消息处理');
   runApp(MyApp());
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // 正常处理数据消息
+  final String title = message.notification?.title ?? '';
+  final String body = message.notification?.body ?? '';
+  final String time = message.data['time'] ?? DateTime.now().toIso8601String();
+  print("[Kyoumai]_firebaseMessagingBackgroundHandler后台推送");
+  _saveMessage(title, body, time);
+  print("[Kyoumai]后台消息处理被触发: ${message.messageId}");
 }
 
 // 通知服务
@@ -112,15 +121,25 @@ class NotificationService {
   }
 }
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  // 确保这里能够处理数据消息
-  if (message.data.isNotEmpty) {
-    // 处理数据消息，例如显示通知
-    NotificationService.showNotification(message);
-  }
-  print("[Kyoumai]后台消息处理被触发: ${message.messageId}");
+Future<void> _saveMessage(String title, String body, String time) async {
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  MessageModel newMessage = MessageModel(
+    id: DateTime.now().millisecondsSinceEpoch,
+    title: title,
+    body: body,
+    time: DateTime.parse(time),
+  );
+
+  List<String>? storedMessages = prefs.getStringList('messages');
+  List<MessageModel> messages = storedMessages != null
+      ? storedMessages.map((e) => MessageModel.fromMap(json.decode(e))).toList()
+      : [];
+
+  messages.add(newMessage);
+  await prefs.setStringList(
+    'messages',
+    messages.map((e) => json.encode(e.toMap())).toList(),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -155,29 +174,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       _messages.map((e) => json.encode(e.toMap())).toList(),
     );
     setState(() {});
-  }
-
-  Future<void> _saveMessage(String title, String body, String time) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    MessageModel newMessage = MessageModel(
-      id: DateTime.now().millisecondsSinceEpoch,
-      title: title,
-      body: body,
-      time: DateTime.parse(time),
-    );
-
-    List<String>? storedMessages = prefs.getStringList('messages');
-    List<MessageModel> messages = storedMessages != null
-        ? storedMessages
-            .map((e) => MessageModel.fromMap(json.decode(e)))
-            .toList()
-        : [];
-
-    messages.add(newMessage);
-    await prefs.setStringList(
-      'messages',
-      messages.map((e) => json.encode(e.toMap())).toList(),
-    );
   }
 
   Future<List<MessageModel>> _loadMessages() async {
