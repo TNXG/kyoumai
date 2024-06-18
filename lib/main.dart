@@ -119,11 +119,11 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   late FirebaseMessaging messaging;
   String fcmToken = '';
   List<MessageModel> _messages = [];
-  bool isFcmAvailable = false; // 添加一个状态变量来表示FCM是否可用
+  bool isFcmAvailable = false;
 
   Future<void> _saveMessage(String title, String body) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -177,6 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 添加观察者
     messaging = FirebaseMessaging.instance;
 
     messaging.requestPermission();
@@ -226,6 +227,17 @@ class _MyHomePageState extends State<MyHomePage> {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       print('Message clicked');
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // 移除观察者
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
   }
 
   @override
