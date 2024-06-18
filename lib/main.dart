@@ -147,13 +147,13 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     setState(() {});
   }
 
-  Future<void> _saveMessage(String title, String body) async {
+  Future<void> _saveMessage(String title, String body, String time) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     MessageModel newMessage = MessageModel(
       id: DateTime.now().millisecondsSinceEpoch,
       title: title,
       body: body,
-      time: DateTime.now(),
+      time: DateTime.parse(time),
     );
 
     List<String>? storedMessages = prefs.getStringList('messages');
@@ -225,17 +225,22 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
     });
 
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      _saveMessage(
-          message.notification?.title ?? '', message.notification?.body ?? '');
+      final String title = message.notification?.title ?? '';
+      final String body = message.notification?.body ?? '';
+      final String time =
+          message.data['time'] ?? DateTime.now().toIso8601String();
+
+      _saveMessage(title, body, time);
       setState(() {
         _messages.insert(
-            0,
-            MessageModel.fromMap({
-              'id': message.hashCode,
-              'title': message.notification?.title ?? '',
-              'body': message.notification?.body ?? '',
-              'time': DateTime.now().toIso8601String(),
-            }));
+          0,
+          MessageModel.fromMap({
+            'id': message.hashCode,
+            'title': title,
+            'body': body,
+            'time': time,
+          }),
+        );
         _messages.sort((a, b) => b.time.compareTo(a.time));
         if (_messages.length > 50) {
           _messages.removeAt(_messages.length - 1);
@@ -331,7 +336,8 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             ),
                           ),
                           Text(
-                            DateFormat('yyyy-MM-dd kk:mm:ss').format(message.time),
+                            DateFormat('yyyy-MM-dd kk:mm:ss')
+                                .format(message.time),
                             style: TextStyle(color: Colors.grey),
                           ),
                         ],
