@@ -2,23 +2,25 @@ import 'package:flutter/material.dart'; // 导入Flutter材料设计包
 import 'package:firebase_core/firebase_core.dart'; // 导入Firebase核心包
 import 'package:firebase_messaging/firebase_messaging.dart'; // 导入Firebase消息传递包
 import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // 导入Flutter本地通知包
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart';
-import 'dart:convert';
-import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart'; // 导入SharedPreferences包
+import 'package:permission_handler/permission_handler.dart'; // 导入权限处理包
+import 'package:intl/intl.dart'; // 导入日期格式化包
+import 'dart:convert'; // 导入JSON编码解码包
+import 'dart:io'; // 导入IO包
 
+// 消息模型
 class MessageModel {
   final int id;
   final String title;
   final String body;
   final DateTime time;
 
-  MessageModel(
-      {required this.id,
-      required this.title,
-      required this.body,
-      required this.time});
+  MessageModel({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.time,
+  });
 
   factory MessageModel.fromMap(Map<String, dynamic> map) {
     return MessageModel(
@@ -39,6 +41,7 @@ class MessageModel {
   }
 }
 
+// 通知服务
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
@@ -52,9 +55,9 @@ class NotificationService {
 
     // 创建通知渠道
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'channel_id', // 与显示通知时使用的ID相同
-      'channel_name',
-      description: 'channel_description',
+      'kyoumaipush', // 与显示通知时使用的ID相同
+      'kyoumai推送服务',
+      description: 'kyoumai自建的FCM推送服务',
       importance: Importance.high,
     );
 
@@ -66,14 +69,24 @@ class NotificationService {
 
   static void showNotification(RemoteMessage message) {
     const NotificationDetails notificationDetails = NotificationDetails(
-        android: AndroidNotificationDetails('channel_id', 'channel_name',
-            importance: Importance.max, priority: Priority.high));
+      android: AndroidNotificationDetails(
+        'kyoumaipush',
+        'kyoumai推送服务',
+        importance: Importance.max,
+        priority: Priority.high,
+      ),
+    );
 
-    _notificationsPlugin.show(message.hashCode, message.notification?.title,
-        message.notification?.body, notificationDetails);
+    _notificationsPlugin.show(
+      message.hashCode,
+      message.notification?.title,
+      message.notification?.body,
+      notificationDetails,
+    );
   }
 }
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   NotificationService.showNotification(message);
@@ -83,7 +96,6 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   if (Platform.isAndroid) {
-    // 使用正则表达式提取数字
     final sdkIntMatch =
         RegExp(r'\d+').firstMatch(Platform.operatingSystemVersion);
     if (sdkIntMatch != null) {
@@ -91,7 +103,6 @@ void main() async {
       if (sdkInt >= 33) {
         final status = await Permission.notification.request();
         if (status != PermissionStatus.granted) {
-          // 如果用户拒绝了通知权限，再次请求权限
           await Permission.notification.request();
         }
       }
@@ -106,7 +117,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'FCM Demo',
+      title: 'Kyoumai',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -128,13 +139,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   Future<void> _deleteMessage(int index) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    _messages.removeAt(index); // 从内存中删除消息
-    // 更新持久化存储的消息列表
+    _messages.removeAt(index);
     await prefs.setStringList(
       'messages',
       _messages.map((e) => json.encode(e.toMap())).toList(),
     );
-    setState(() {}); // 刷新UI
+    setState(() {});
   }
 
   Future<void> _saveMessage(String title, String body) async {
@@ -154,7 +164,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
         : [];
 
     messages.add(newMessage);
-
     await prefs.setStringList(
       'messages',
       messages.map((e) => json.encode(e.toMap())).toList(),
@@ -189,7 +198,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // 添加观察者
+    WidgetsBinding.instance.addObserver(this);
     messaging = FirebaseMessaging.instance;
 
     messaging.requestPermission();
@@ -198,12 +207,12 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       if (token != null) {
         setState(() {
           fcmToken = token;
-          isFcmAvailable = true; // 成功获取Token，更新状态为可用
+          isFcmAvailable = true;
         });
         print("FCM Token: $token");
       } else {
         setState(() {
-          isFcmAvailable = false; // 未能获取Token，更新状态为不可用
+          isFcmAvailable = false;
         });
         print("Failed to get FCM token.");
       }
@@ -211,7 +220,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
     _loadMessages().then((loadedMessages) {
       setState(() {
-        // 对消息进行时间倒序排序
         _messages = loadedMessages..sort((a, b) => b.time.compareTo(a.time));
       });
     });
@@ -228,7 +236,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               'body': message.notification?.body ?? '',
               'time': DateTime.now().toIso8601String(),
             }));
-        // 保持消息列表按时间倒序排序
         _messages.sort((a, b) => b.time.compareTo(a.time));
         if (_messages.length > 50) {
           _messages.removeAt(_messages.length - 1);
@@ -243,7 +250,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // 移除观察者
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -256,7 +263,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("FCM Tester"),
+        title: Text("kyoumai"),
       ),
       body: Column(
         children: [
@@ -264,11 +271,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
             padding: const EdgeInsets.all(8.0),
             child: Text("FCM Token：$fcmToken"),
           ),
-          if (!isFcmAvailable) // 当 FCM Token 获取失败时显示按钮
+          if (!isFcmAvailable)
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: ElevatedButton(
-                onPressed: _retryGetFcmToken, // 点击按钮时尝试重新获取 Token
+                onPressed: _retryGetFcmToken,
                 child: Text("重新获取 FCM Token"),
               ),
             ),
@@ -279,7 +286,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                 MessageModel message = _messages[index];
                 return GestureDetector(
                   onLongPress: () async {
-                    // 显示确认对话框
                     final bool? confirmDelete = await showDialog<bool>(
                       context: context,
                       builder: (BuildContext context) {
@@ -299,7 +305,6 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                         );
                       },
                     );
-                    // 如果用户确认删除，则调用删除方法
                     if (confirmDelete ?? false) {
                       _deleteMessage(index);
                     }
@@ -314,17 +319,19 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(message.title,
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 18)),
+                                Text(
+                                  message.title,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18),
+                                ),
                                 SizedBox(height: 7),
                                 Text(message.body),
                               ],
                             ),
                           ),
                           Text(
-                            DateFormat('yyyy-MM-dd kk:mm').format(message.time),
+                            DateFormat('yyyy-MM-dd kk:mm:ss').format(message.time),
                             style: TextStyle(color: Colors.grey),
                           ),
                         ],
