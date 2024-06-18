@@ -91,7 +91,8 @@ void main() async {
       if (sdkInt >= 33) {
         final status = await Permission.notification.request();
         if (status != PermissionStatus.granted) {
-          // 处理未授权的情况
+          // 如果用户拒绝了通知权限，再次请求权限
+          await Permission.notification.request();
         }
       }
     }
@@ -124,6 +125,17 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   String fcmToken = '';
   List<MessageModel> _messages = [];
   bool isFcmAvailable = false;
+
+  Future<void> _deleteMessage(int index) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _messages.removeAt(index); // 从内存中删除消息
+    // 更新持久化存储的消息列表
+    await prefs.setStringList(
+      'messages',
+      _messages.map((e) => json.encode(e.toMap())).toList(),
+    );
+    setState(() {}); // 刷新UI
+  }
 
   Future<void> _saveMessage(String title, String body) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -265,30 +277,58 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 MessageModel message = _messages[index];
-                return Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(message.title,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 18)),
-                              SizedBox(height: 7),
-                              Text(message.body),
-                            ],
+                return GestureDetector(
+                  onLongPress: () async {
+                    // 显示确认对话框
+                    final bool? confirmDelete = await showDialog<bool>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: Text('删除消息'),
+                          content: Text('确定要删除这条消息吗？'),
+                          actions: <Widget>[
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: Text('取消'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: Text('确定'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    // 如果用户确认删除，则调用删除方法
+                    if (confirmDelete ?? false) {
+                      _deleteMessage(index);
+                    }
+                  },
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(message.title,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18)),
+                                SizedBox(height: 7),
+                                Text(message.body),
+                              ],
+                            ),
                           ),
-                        ),
-                        Text(
-                          DateFormat('yyyy-MM-dd kk:mm').format(message.time),
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
+                          Text(
+                            DateFormat('yyyy-MM-dd kk:mm').format(message.time),
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
