@@ -69,7 +69,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final String body = message.notification?.body ?? '';
   final String time = message.data['time'] ?? DateTime.now().toIso8601String();
   print("[Kyoumai]_firebaseMessagingBackgroundHandler后台推送");
-  _saveMessage(title, body, time);
+  await _saveMessage(title, body, time); // 确保保存消息
   print("[Kyoumai]后台消息处理被触发: ${message.messageId}");
 }
 
@@ -155,7 +155,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
 class MyHomePage extends StatefulWidget {
   @override
   _MyHomePageState createState() => _MyHomePageState();
@@ -196,7 +195,7 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       });
     });
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       final String title = message.notification?.title ?? '';
       final String body = message.notification?.body ?? '';
       final String time =
@@ -205,21 +204,11 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
       NotificationService.showNotification(message);
       print("[Kyoumai]草");
       print("[Kyoumai]Message received: $title, $body, $time");
-      _saveMessage(title, body, time);
-      setState(() {
-        _messages.insert(
-          0,
-          MessageModel.fromMap({
-            'id': message.hashCode,
-            'title': title,
-            'body': body,
-            'time': time,
-          }),
-        );
-        _messages.sort((a, b) => b.time.compareTo(a.time));
-        if (_messages.length > 50) {
-          _messages.removeAt(_messages.length - 1);
-        }
+      await _saveMessage(title, body, time); // 确保保存消息
+      _loadMessages().then((loadedMessages) {
+        setState(() {
+          _messages = loadedMessages..sort((a, b) => b.time.compareTo(a.time));
+        });
       });
     });
 
@@ -272,6 +261,10 @@ class _MyHomePageState extends State<MyHomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // 当应用从后台恢复到前台时，重绘页面
+      setState(() {});
+    }
   }
 
   @override
